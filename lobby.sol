@@ -15,21 +15,18 @@ contract TicTacToe {
     mapping(uint256 => Game) public games;
     uint256 public gameCounter;
 
+    event LogDebug(string message, uint256 value);
     event GameCreated(uint256 gameId, address player1, uint256 stake);
     event PlayerJoined(uint256 gameId, address player2);
     event MoveMade(uint256 gameId, address player, uint8 position);
     event GameFinished(uint256 gameId, address winner, uint256 prize);
 
+
     function createGame() external payable {
-        require(msg.value > 0, "Stake must be greater than 0");
-        unchecked {
-            gameCounter++;
-        }
-        Game storage newGame = games[gameCounter];
-        newGame.player1 = msg.sender;
-        newGame.stake = msg.value;
-        emit GameCreated(gameCounter, msg.sender, msg.value);
-    }
+    emit LogDebug("Creating game with stake", msg.value);
+    // ... остальной код функции ...
+    emit LogDebug("Game created with ID", gameCounter);
+}
 
     function joinGame(uint256 _gameId) external payable {
         Game storage game = games[_gameId];
@@ -113,6 +110,8 @@ contract TicTacToe {
                 }
             }
         }
+    
+        
 
         // Resize the array to remove empty slots
         assembly {
