@@ -25,7 +25,7 @@
         blockExplorerUrls: ['https://testnet.soniclabs.com']
     };
 
-    const contractAddress = '0xd29e7889343a9e9261b424444da1e5b397155f89';
+    const contractAddress = '0x6c41d9f7518b71f3851b72a4e7d20e059d3d4217';
     const contractABI = [
         {
             "inputs": [],
@@ -328,7 +328,7 @@
                 createGameBtn.disabled = false;
 
                 await updateBalance();
-                await getAvailableGames();
+                await getAvailableGames(); // Добавьте эту строку
                 listenToEvents();
             } catch (error) {
                 console.error("Error connecting wallet:", error);
@@ -374,27 +374,69 @@
 
     async function createGame() {
         try {
-            const stake = prompt("Enter stake amount (in S):");
-            const stakeInWei = web3.utils.toWei(stake, 'ether');
-            await contract.methods.createGame().send({ from: userAccount, value: stakeInWei });
-            statusEl.textContent = "Game created successfully!";
+            // Запрашиваем у пользователя ставку
+            const stakeAmount = prompt("Enter stake amount (in S):");
+            if (!stakeAmount || isNaN(parseFloat(stakeAmount)) || parseFloat(stakeAmount) <= 0) {
+                throw new Error("Invalid stake amount");
+            }
+    
+            const stakeInWei = web3.utils.toWei(stakeAmount, 'ether');
+    
+            console.log("Creating game with stake:", stakeAmount, "S");
+    
+            // Оцениваем газ
+            const gasEstimate = await contract.methods.createGame().estimateGas({
+                from: userAccount,
+                value: stakeInWei
+            });
+            console.log("Estimated gas:", gasEstimate);
+    
+            // Получаем текущую цену газа
+            const gasPrice = await web3.eth.getGasPrice();
+            console.log("Current gas price:", gasPrice);
+    
+            // Отправляем транзакцию
+            const tx = await contract.methods.createGame().send({
+                from: userAccount,
+                value: stakeInWei,
+                gas: Math.floor(gasEstimate * 1.2), // Увеличиваем оценку газа на 20%
+                gasPrice: gasPrice
+            });
+    
+            console.log("Game created successfully. Transaction:", tx.transactionHash);
+    
+            // Обновляем баланс и список игр
+            await updateBalance();
             await getAvailableGames();
+    
+            // Обновляем статус
+            document.getElementById('status').textContent = `Game created successfully! Game ID: ${tx.events.GameCreated.returnValues.gameId}`;
         } catch (error) {
             console.error("Error creating game:", error);
-            statusEl.textContent = 'Failed to create game: ' + error.message;
+            document.getElementById('status').textContent = "Failed to create game: " + error.message;
         }
     }
 
     async function getAvailableGames() {
         try {
             const games = await contract.methods.getAvailableGames().call();
+            const gamesList = document.getElementById('gamesList');
             gamesList.innerHTML = '<h3>Available Games:</h3>';
+    
             for (let gameId of games) {
-                const game = await contract.methods.getGameState(gameId).call();
+                const gameInfo = await contract.methods.getGameState(gameId).call();
+                const stakeAmount = web3.utils.fromWei(gameInfo.stake, 'ether');
+                
                 const gameElement = document.createElement('div');
-                gameElement.innerHTML = `Game ${gameId} - Stake: ${web3.utils.fromWei(game.stake, 'ether')} S 
-                                         <button onclick="window.joinGame(${gameId})">Join</button>`;
+                gameElement.innerHTML = `
+                    Game ${gameId} - Stake: ${stakeAmount} S 
+                    <button onclick="joinGame(${gameId})">Join Game</button>
+                `;
                 gamesList.appendChild(gameElement);
+            }
+    
+            if (games.length === 0) {
+                gamesList.innerHTML += '<p>No available games. Create a new one!</p>';
             }
         } catch (error) {
             console.error("Error getting available games:", error);
@@ -403,14 +445,38 @@
 
     async function joinGame(gameId) {
         try {
-            const game = await contract.methods.getGameState(gameId).call();
-            await contract.methods.joinGame(gameId).send({ from: userAccount, value: game.stake });
-            currentGameId = gameId;
-            statusEl.textContent = "Joined the game successfully!";
-            await updateBoard();
+            console.log("Attempting to join game:", gameId);
+    
+            // Получаем информацию об игре из смарт-контракта
+            const gameInfo = await contract.methods.getGameState(gameId).call();
+            const stakeAmount = web3.utils.fromWei(gameInfo.stake, 'ether');
+            console.log("Stake amount from contract:", stakeAmount);
+    
+            if (!stakeAmount || parseFloat(stakeAmount) <= 0) {
+                throw new Error("Invalid stake amount for the game");
+            }
+    
+            const gasEstimate = await contract.methods.joinGame(gameId).estimateGas({
+                from: userAccount,
+                value: gameInfo.stake // Используем stake напрямую из контракта
+            });
+            console.log("Estimated gas:", gasEstimate);
+    
+            const gasPrice = await web3.eth.getGasPrice();
+            console.log("Current gas price:", gasPrice);
+    
+            const tx = await contract.methods.joinGame(gameId).send({
+                from: userAccount,
+                value: gameInfo.stake, // Используем stake напрямую из контракта
+                gas: Math.floor(gasEstimate * 1.5),  // Увеличиваем оценку газа на 50%
+                gasPrice: gasPrice
+            });
+    
+            console.log("Transaction receipt:", tx);
+            console.log("Successfully joined game:", gameId);
         } catch (error) {
             console.error("Error joining game:", error);
-            statusEl.textContent = 'Failed to join game: ' + error.message;
+            alert("Failed to join game: " + error.message);
         }
     }
 
