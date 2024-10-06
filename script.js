@@ -25,7 +25,7 @@
         blockExplorerUrls: ['https://testnet.soniclabs.com']
     };
 
-    const contractAddress = '0x84c7c3586f1c5856970ba926af32bbe45654f95c';
+    const contractAddress = '0xd29e7889343a9e9261b424444da1e5b397155f89';
     const contractABI = [
         {
             "inputs": [],
