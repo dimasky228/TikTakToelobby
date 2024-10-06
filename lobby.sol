@@ -22,16 +22,12 @@ contract TicTacToe {
 
     function createGame() external payable {
         require(msg.value > 0, "Stake must be greater than 0");
-        gameCounter++;
-        games[gameCounter] = Game({
-            player1: msg.sender,
-            player2: address(0),
-            currentTurn: address(0),
-            board: [0, 0, 0, 0, 0, 0, 0, 0, 0],
-            isFinished: false,
-            winner: address(0),
-            stake: msg.value
-        });
+        unchecked {
+            gameCounter++;
+        }
+        Game storage newGame = games[gameCounter];
+        newGame.player1 = msg.sender;
+        newGame.stake = msg.value;
         emit GameCreated(gameCounter, msg.sender, msg.value);
     }
 
@@ -112,7 +108,9 @@ contract TicTacToe {
         for (uint256 i = 1; i <= gameCounter; i++) {
             if (games[i].player2 == address(0) && !games[i].isFinished) {
                 availableGames[count] = i;
-                count++;
+                unchecked {
+                    count++;
+                }
             }
         }
 
